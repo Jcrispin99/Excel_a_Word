@@ -1,12 +1,13 @@
 import os
 import pandas as pd
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor # <--- Añadir RGBColor
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
 from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from datetime import datetime # <--- Añadir esta importación
 
 def set_table_borders(table):
     # Tu código existente para configurar bordes
@@ -133,20 +134,65 @@ def generate_word_document(excel_path, images_dir, output_path):
                     p.text = "Imagen no encontrada"
             
             # Tabla de datos
-            data_table = left_cell.add_table(rows=6, cols=1)
+            # La tabla ahora necesitará más filas para acomodar los merges y nuevos campos
+            # CÓDIGO (4) + REVISADO (2) + BLANCO (1) + RECEPCIONADO (1) + DESCRIPCIÓN (1) + CAJA (1) + CANTIDAD (1) = 11 filas
+            data_table = left_cell.add_table(rows=11, cols=1)
             data_table.alignment = WD_TABLE_ALIGNMENT.CENTER
             set_table_borders(data_table)
             
-            for row_cells in data_table.rows:
-                for cell in row_cells.cells:
-                    adjust_cell_spacing(cell)
+            # Aplicar ajuste de espaciado a todas las celdas de data_table
+            for r_idx, row_cells_dt in enumerate(data_table.rows):
+                for c_idx, cell_dt in enumerate(row_cells_dt.cells):
+                    adjust_cell_spacing(cell_dt)
             
-            data_table.cell(0, 0).text = f"CÓDIGO: {row['CODIGO']}"
-            data_table.cell(1, 0).text = "REVISADO POR:"
-            data_table.cell(2, 0).text = f"DESCRIPCIÓN: {row['DESCRIPCION']}"
-            data_table.cell(3, 0).text = f"CAJA {num_caja} DE {num_cajas}"
-            data_table.cell(4, 0).text = "RECEPCIONADO:"
-            data_table.cell(5, 0).text = f"CANTIDAD: {row['CANTIDAD']}"
+            # 1. Celda para CÓDIGO (ocupa 4 filas)
+            codigo_cell = data_table.cell(0, 0)
+            
+            # Limpiar el contenido por defecto y añadir el nuevo con formato
+            codigo_cell.text = '' # Limpiar cualquier texto previo
+            p_codigo = codigo_cell.paragraphs[0]
+            p_codigo.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            run_codigo = p_codigo.add_run(str(row['CODIGO']))
+            run_codigo.font.size = Pt(33)
+            run_codigo.font.color.rgb = RGBColor(255, 0, 0) # Color Rojo
+
+            # Fusionar las celdas para CÓDIGO
+            codigo_cell.merge(data_table.cell(1, 0))
+            codigo_cell.merge(data_table.cell(2, 0))
+            codigo_cell.merge(data_table.cell(3, 0))
+            
+            # Ajustar alineación vertical de la celda fusionada de CÓDIGO a 'center'
+            tcPr_codigo = codigo_cell._element.get_or_add_tcPr()
+            # Eliminar alineación vertical previa si existe (de adjust_cell_spacing)
+            existing_vAlign = tcPr_codigo.find(qn('w:vAlign'))
+            if existing_vAlign is not None:
+                tcPr_codigo.remove(existing_vAlign)
+            # Añadir nueva alineación vertical
+            vAlign_codigo = OxmlElement('w:vAlign')
+            vAlign_codigo.set(qn('w:val'), 'center') # Centrar verticalmente
+            tcPr_codigo.append(vAlign_codigo)
+
+            # 2. Celda para REVISADO POR (ocupa 2 filas)
+            revisado_cell = data_table.cell(4, 0)
+            revisado_cell.text = "REVISADO POR:"
+            # Fusionar las celdas para REVISADO POR
+            revisado_cell.merge(data_table.cell(5, 0))
+
+            # 3. Celda en BLANCO (ocupa 1 fila)
+            # data_table.cell(6, 0).text = "" # Ya está vacía por defecto
+
+            # 4. Celda para RECEPCIONADO (ocupa 1 fila)
+            current_date = datetime.now().strftime("%d/%m/%Y")
+            data_table.cell(7, 0).text = f"RECEPCIONADO: {current_date}"
+            
+            # 5. Celda para DESCRIPCIÓN (ocupa 1 fila)
+            data_table.cell(8, 0).text = f"DESCRIPCIÓN: {row['DESCRIPCION']}"
+            
+            # 6. Celda para CAJA (ocupa 1 fila)
+            data_table.cell(9, 0).text = f"CAJA {num_caja} DE {num_cajas}"
+            
+            # 7. Celda para CANTIDAD (ocupa 1 fila)
+            data_table.cell(10, 0).text = f"CANTIDAD: {row['CANTIDAD']}"
             
             # Celda derecha: tabla de registro
             right_cell = table.cell(0, 1)
