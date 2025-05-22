@@ -82,12 +82,23 @@ def generate_word_document(excel_path, images_dir, output_path):
         # Buscar la imagen correspondiente en el directorio de imágenes
         imagen_path = None
         if 'IMAGEN' in row and pd.notna(row['IMAGEN']):
-            imagen_nombre = str(row['IMAGEN'])
-            for root, dirs, files in os.walk(images_dir):
-                for file in files:
-                    if file.lower() == imagen_nombre.lower() or file.lower() == os.path.basename(imagen_nombre).lower():
-                        imagen_path = os.path.join(root, file)
-                        break
+            imagen_nombre = str(row['IMAGEN']).strip() # Obtener el valor del Excel y limpiar espacios
+
+            if imagen_nombre: # Solo proceder si imagen_nombre no está vacío después de strip()
+                # Si imagen_nombre no contiene un punto (es decir, no tiene extensión), añadir '.jpg'
+                if '.' not in imagen_nombre:
+                    imagen_nombre += '.jpg'
+                
+                # Ahora, imagen_nombre contiene el nombre del archivo a buscar (ej: "codigo.jpg" o "imagen.png")
+                # Buscar el archivo en el directorio de imágenes (y subdirectorios)
+                for root, dirs, files_in_current_dir in os.walk(images_dir):
+                    for file_name in files_in_current_dir:
+                        # Comparar el nombre del archivo encontrado con imagen_nombre (ignorando mayúsculas/minúsculas)
+                        if file_name.lower() == imagen_nombre.lower():
+                            imagen_path = os.path.join(root, file_name)
+                            break # Imagen encontrada, salir del bucle de archivos
+                    if imagen_path:
+                        break # Imagen encontrada, salir del bucle de directorios
         
         # Obtener el número de cajas
         num_cajas = int(row.get('CONTEO_CAJAS', 1))
