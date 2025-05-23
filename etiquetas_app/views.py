@@ -37,6 +37,7 @@ def procesar_archivos(request):
             output_path = os.path.join(base_output_path, output_filename)
 
             temp_dir = None  # Inicializar temp_dir para el bloque finally
+            archivos_a_limpiar = []  # Lista para seguimiento de archivos a eliminar
 
             try:
                 # Asegurar que los directorios de carga y salida existan
@@ -48,17 +49,20 @@ def procesar_archivos(request):
                 with open(excel_path, 'wb+') as destination:
                     for chunk in excel_file_uploaded.chunks():
                         destination.write(chunk)
+                archivos_a_limpiar.append(excel_path)  # Añadir a la lista de limpieza
                 
                 with open(zip_path, 'wb+') as destination:
                     for chunk in zip_file_uploaded.chunks():
                         destination.write(chunk)
+                archivos_a_limpiar.append(zip_path)  # Añadir a la lista de limpieza
 
                 # Verificar la configuración de TEMP_DIR
                 if not hasattr(settings, 'TEMP_DIR') or not settings.TEMP_DIR:
                     messages.error(request, "Error de configuración: TEMP_DIR no está definido en settings.py.")
                     # Limpiar archivos subidos si no podemos proceder
-                    if os.path.exists(excel_path): os.remove(excel_path)
-                    if os.path.exists(zip_path): os.remove(zip_path)
+                    for archivo in archivos_a_limpiar:
+                        if os.path.exists(archivo): 
+                            os.remove(archivo)
                     return redirect('index')
                 
                 # Crear directorio temporal para la extracción de imágenes
@@ -69,7 +73,6 @@ def procesar_archivos(request):
                 try:
                     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                         zip_ref.extractall(temp_dir)
-                    # No es necesario un mensaje de éxito aquí, se puede dar uno general al final
                 except zipfile.BadZipFile:
                     messages.error(request, f"El archivo ZIP '{zip_file_uploaded.name}' está corrupto o no es un ZIP válido.")
                     raise # Re-lanzar para ser capturado por el try-except principal y limpiar temp_dir
@@ -80,7 +83,7 @@ def procesar_archivos(request):
                 # Generar documento Word
                 generate_word_document(excel_path, temp_dir, output_path)
                 
-                # Guardar referencia en la base de datos
+                # Guardar referencia en la base de datos si el usuario está autenticado
                 if request.user.is_authenticated:
                     ArchivoGenerado.objects.create(
                         usuario=request.user,
@@ -88,6 +91,12 @@ def procesar_archivos(request):
                         zip_original=os.path.join('uploads', 'zip', zip_filename),
                         documento_generado=os.path.join('output', output_filename)
                     )
+                else:
+                    # Si el usuario no está autenticado, podemos eliminar los archivos originales
+                    # ya que no hay referencia en la base de datos
+                    for archivo in archivos_a_limpiar:
+                        if os.path.exists(archivo):
+                            os.remove(archivo)
                 
                 request.session['documento_generado'] = output_path
                 messages.success(request, "Archivos procesados y documento generado exitosamente.")
@@ -95,14 +104,20 @@ def procesar_archivos(request):
 
             except Exception as e:
                 messages.error(request, f"Error general al procesar los archivos: {str(e)}")
-                # Los archivos subidos (excel, zip) no se eliminan aquí,
-                # podrían ser útiles para depuración o ya están persistidos.
                 return redirect('index')
             
             finally:
                 # Limpiar el directorio temporal si fue creado
                 if temp_dir and os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
+                    
+                # Opcionalmente, limpiar archivos originales si no se guardaron en la base de datos
+                # Esto se puede habilitar si se desea una limpieza agresiva
+                # if not request.user.is_authenticated:
+                #     for archivo in archivos_a_limpiar:
+                #         if os.path.exists(archivo):
+                #             os.remove(archivo)
+
         else:
             # Si el formulario no es válido, mostrar errores en la página de subida
             # Los mensajes de error del formulario se mostrarán automáticamente por la plantilla
