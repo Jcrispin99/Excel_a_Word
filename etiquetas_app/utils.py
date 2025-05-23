@@ -8,6 +8,8 @@ from docx.oxml.ns import qn
 from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from datetime import datetime # <--- Añadir esta importación
+import qrcode # <--- Añadir esta importación
+import io     # <--- Añadir esta importación
 
 def set_table_borders(table):
     # Tu código existente para configurar bordes
@@ -150,13 +152,36 @@ def generate_word_document(excel_path, images_dir, output_path):
             
             # Limpiar el contenido por defecto y añadir el nuevo con formato
             codigo_cell.text = '' # Limpiar cualquier texto previo
-            p_codigo = codigo_cell.paragraphs[0]
+            
+            # Párrafo para el texto del CÓDIGO
+            p_codigo = codigo_cell.paragraphs[0] # Usar el párrafo existente o añadir uno nuevo si es necesario
+            if not codigo_cell.paragraphs: # Asegurar que haya al menos un párrafo
+                 p_codigo = codigo_cell.add_paragraph()
+            else:
+                 p_codigo = codigo_cell.paragraphs[0]
+            
             p_codigo.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             run_codigo = p_codigo.add_run(str(row['CODIGO']))
             run_codigo.font.size = Pt(33)
             run_codigo.font.color.rgb = RGBColor(255, 0, 0) # Color Rojo
 
-            # Fusionar las celdas para CÓDIGO
+            # Generar y añadir el Código QR debajo del texto del código
+            qr_data = str(row['CODIGO'])
+            qr_img = qrcode.make(qr_data)
+            
+            # Guardar QR en un stream en memoria
+            qr_image_stream = io.BytesIO()
+            qr_img.save(qr_image_stream, format='PNG')
+            qr_image_stream.seek(0) # Rebobinar el stream al principio
+
+            # Añadir un nuevo párrafo para el QR en la misma celda
+            p_qr = codigo_cell.add_paragraph() 
+            p_qr.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            run_qr = p_qr.add_run()
+            # Ajusta el tamaño del QR según necesites, por ejemplo Inches(1.0) o Inches(1.5)
+            run_qr.add_picture(qr_image_stream, width=Inches(2.0)) 
+
+            # Fusionar las celdas para CÓDIGO (esto ya lo tenías)
             codigo_cell.merge(data_table.cell(1, 0))
             codigo_cell.merge(data_table.cell(2, 0))
             codigo_cell.merge(data_table.cell(3, 0))
