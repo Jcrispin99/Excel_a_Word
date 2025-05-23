@@ -10,6 +10,7 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from datetime import datetime # <--- Añadir esta importación
 import qrcode # <--- Añadir esta importación
 import io     # <--- Añadir esta importación
+from PIL import Image
 
 def set_table_borders(table):
     # Tu código existente para configurar bordes
@@ -90,7 +91,7 @@ def generate_word_document(excel_path, images_dir, output_path):
             if imagen_nombre: # Solo proceder si imagen_nombre no está vacío después de strip()
                 # Si imagen_nombre no contiene un punto (es decir, no tiene extensión), añadir '.jpg'
                 if '.' not in imagen_nombre:
-                    imagen_nombre += '.jpg'
+                    imagen_nombre += '.PNG'
                 
                 # Ahora, imagen_nombre contiene el nombre del archivo a buscar (ej: "codigo.jpg" o "imagen.png")
                 # Buscar el archivo en el directorio de imágenes (y subdirectorios)
@@ -124,16 +125,38 @@ def generate_word_document(excel_path, images_dir, output_path):
             # Celda izquierda: imagen y datos
             left_cell = table.cell(0, 0)
             
+            # Modificar la parte donde se inserta la imagen (alrededor de la línea 120)
             # Agregar imagen si existe
             if imagen_path and os.path.exists(imagen_path):
                 try:
                     p = left_cell.paragraphs[0]
                     p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                     run = p.add_run()
-                    run.add_picture(imagen_path, width=Inches(2.5))
-                except Exception:
+                    
+                    # Obtener dimensiones originales de la imagen
+                    with Image.open(imagen_path) as img:
+                        width_orig, height_orig = img.size
+                        ratio = height_orig / width_orig
+                    
+                    # Establecer ancho fijo y calcular altura proporcional
+                    width_inches = 2.5  # Ancho fijo en pulgadas
+                    
+                    # Establecer un límite máximo para la altura (por ejemplo, 3 pulgadas)
+                    max_height_inches = 3.0
+                    
+                    # Calcular altura proporcional
+                    height_inches = width_inches * ratio
+                    
+                    # Si la altura calculada excede el máximo, ajustar proporcionalmente
+                    if height_inches > max_height_inches:
+                        height_inches = max_height_inches
+                        width_inches = height_inches / ratio
+                    
+                    # Insertar imagen con las dimensiones calculadas
+                    run.add_picture(imagen_path, width=Inches(width_inches), height=Inches(height_inches))
+                except Exception as e:
                     p = left_cell.paragraphs[0]
-                    p.text = "Imagen no encontrada"
+                    p.text = f"Error al procesar imagen: {str(e)}"
             
             # Tabla de datos
             # La tabla ahora necesitará más filas para acomodar los merges y nuevos campos
