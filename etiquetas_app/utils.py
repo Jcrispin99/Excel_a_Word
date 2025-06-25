@@ -89,20 +89,33 @@ def generate_word_document(excel_path, images_dir, output_path):
             imagen_nombre = str(row['IMAGEN']).strip() # Obtener el valor del Excel y limpiar espacios
 
             if imagen_nombre: # Solo proceder si imagen_nombre no está vacío después de strip()
-                # Si imagen_nombre no contiene un punto (es decir, no tiene extensión), añadir '.jpg'
-                if '.' not in imagen_nombre:
-                    imagen_nombre += '.PNG'
+                # Definir extensiones de imagen soportadas
+                extensiones_imagen = ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp']
                 
-                # Ahora, imagen_nombre contiene el nombre del archivo a buscar (ej: "codigo.jpg" o "imagen.png")
-                # Buscar el archivo en el directorio de imágenes (y subdirectorios)
-                for root, dirs, files_in_current_dir in os.walk(images_dir):
-                    for file_name in files_in_current_dir:
-                        # Comparar el nombre del archivo encontrado con imagen_nombre (ignorando mayúsculas/minúsculas)
-                        if file_name.lower() == imagen_nombre.lower():
-                            imagen_path = os.path.join(root, file_name)
-                            break # Imagen encontrada, salir del bucle de archivos
-                    if imagen_path:
-                        break # Imagen encontrada, salir del bucle de directorios
+                # Si imagen_nombre no contiene un punto (es decir, no tiene extensión), buscar con todas las extensiones
+                if '.' not in imagen_nombre:
+                    # Buscar el archivo con cualquiera de las extensiones soportadas
+                    for root, dirs, files_in_current_dir in os.walk(images_dir):
+                        for file_name in files_in_current_dir:
+                            # Obtener el nombre base del archivo sin extensión
+                            nombre_base, extension = os.path.splitext(file_name)
+                            # Comparar el nombre base con imagen_nombre (ignorando mayúsculas/minúsculas)
+                            if (nombre_base.lower() == imagen_nombre.lower() and 
+                                extension.lower() in extensiones_imagen):
+                                imagen_path = os.path.join(root, file_name)
+                                break # Imagen encontrada, salir del bucle de archivos
+                        if imagen_path:
+                            break # Imagen encontrada, salir del bucle de directorios
+                else:
+                    # Si ya tiene extensión, buscar exactamente ese archivo
+                    for root, dirs, files_in_current_dir in os.walk(images_dir):
+                        for file_name in files_in_current_dir:
+                            # Comparar el nombre del archivo encontrado con imagen_nombre (ignorando mayúsculas/minúsculas)
+                            if file_name.lower() == imagen_nombre.lower():
+                                imagen_path = os.path.join(root, file_name)
+                                break # Imagen encontrada, salir del bucle de archivos
+                        if imagen_path:
+                            break # Imagen encontrada, salir del bucle de directorios
         
         # Obtener el número de cajas
         num_cajas = int(row.get('CONTEO_CAJAS', 1))
